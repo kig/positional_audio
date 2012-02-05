@@ -64,30 +64,6 @@ Demo.prototype = {
     this.scene.add(this.camera);
   },
 
-  setupCamera : function() {
-    this.camera = new THREE.PerspectiveCamera(
-        45, this.width/this.height, 0.1, 10000);
-    this.camera.position.z = 800;
-    this.camera.position.y = 150;
-  },
-
-  setupObjects : function() {
-    var cubeGeo = new THREE.CubeGeometry(200,100,200);
-    var cubeMat = new THREE.MeshLambertMaterial({color: 0xFF0000});
-    var cube = new THREE.Mesh(cubeGeo, cubeMat);
-    this.cube = cube;
-    this.scene.add(cube);
-
-    var light = new THREE.PointLight(0xFFFFFF);
-    light.position.x = 400;
-    light.position.y = 400;
-    light.position.z = 400;
-    this.light = light;
-    this.scene.add(light);
-
-    this.setupAudio();
-  },
-
   audioFileName : 'breakbeat.wav',
 
   setupAudio : function() {
@@ -113,17 +89,100 @@ Demo.prototype = {
     request.send();
   },
 
+  setupCamera : function() {
+    this.camera = new THREE.PerspectiveCamera(
+        45, this.width/this.height, 0.01, 1000);
+    this.camera.position.z = 8.00;
+    this.camera.position.y = -0.50;
+  },
+
+  setupObjects : function() {
+    var cubeGeo = new THREE.CubeGeometry(2.00,1.00,2.00);
+    var cubeMat = new THREE.MeshLambertMaterial({color: 0xFF0000});
+    var cube = new THREE.Mesh(cubeGeo, cubeMat);
+    this.cube = cube;
+    this.scene.add(cube);
+
+    var light = new THREE.PointLight(0xFFFFFF);
+    light.position.x = 4.00;
+    light.position.y = 4.00;
+    light.position.z = 4.00;
+    this.light = light;
+    this.scene.add(light);
+
+    var plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 200, 20, 200),
+      new THREE.MeshLambertMaterial({color: 0xffffff})
+    );
+    plane.position.y = -5.0;
+    plane.rotation.x = -Math.PI/2;
+    this.scene.add(plane);
+
+    this.setupAudio();
+    this.keyForward = this.keyBackward = this.keyLeft = this.keyRight = false;
+    var self = this;
+
+    window.addEventListener('keydown', function(ev) {
+       switch (ev.keyCode) {
+        case 'W'.charCodeAt(0):
+          self.keyForward = true; break;
+        case 'S'.charCodeAt(0):
+          self.keyBackward = true; break;
+        case 'A'.charCodeAt(0):
+          self.keyLeft = true; break;
+        case 'D'.charCodeAt(0):
+          self.keyRight = true; break;
+      }
+    }, false);
+    window.addEventListener('keyup', function(ev) {
+      switch (ev.keyCode) {
+        case 'W'.charCodeAt(0):
+          self.keyForward = false; break;
+        case 'S'.charCodeAt(0):
+          self.keyBackward = false; break;
+        case 'A'.charCodeAt(0):
+          self.keyLeft = false; break;
+        case 'D'.charCodeAt(0):
+          self.keyRight = false; break;
+      }
+    }, false);
+  },
+
   update : function(t, dt) {
+    var vx = 0, vz = 0, vy = 0;
+    if (this.keyForward) {
+      this.camera.position.z -= dt/100;
+      vz -= 10;
+    }
+    if (this.keyBackward) {
+      this.camera.position.z += dt/100;
+      vz += 10;
+    }
+    if (this.keyLeft) {
+      this.camera.position.x -= dt/100;
+      vx -= 10;
+    }
+    if (this.keyRight) {
+      this.camera.position.x += dt/100;
+      vx += 10;
+    }
+
     this.cube.rotation.x += dt/1000;
     this.cube.rotation.y += dt/800;
-    this.cube.position.x = Math.cos(t/3000) * 500;
-    this.cube.position.z = Math.sin(t/3000) * 500;
-    this.cube.position.y = Math.sin(t/600) * 150;
+    this.cube.position.x = Math.cos(t/3000) * 5.00;
+    this.cube.position.z = Math.sin(t/3000) * 5.00;
+    this.cube.position.y = Math.sin(t/600) * 1.50;
 
-    var rx = this.cube.position.x - this.camera.position.x;
-    var ry = this.cube.position.y - this.camera.position.y;
-    var rz = this.cube.position.z - this.camera.position.z;
-    this.audio.panner.setPosition(rx/200, ry/200, rz/200);
+    var rx = this.cube.position.x;
+    var ry = this.cube.position.y;
+    var rz = this.cube.position.z;
+    this.audio.panner.setPosition(rx, ry, rz);
+
+    var cx = this.camera.position.x;
+    var cy = this.camera.position.y;
+    var cz = this.camera.position.z;
+    this.audio.context.listener.setPosition(cx, cy, cz);
+    this.audio.context.listener.setVelocity(vx, vy, vz);
   }
 
 };
