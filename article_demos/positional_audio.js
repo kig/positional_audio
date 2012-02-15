@@ -76,9 +76,55 @@ Demo.prototype = {
     a.convolver = a.context.createConvolver();
     a.volume = a.context.createGainNode();
 
-    a.convolver.connect(a.volume);
+    a.mixer = a.context.createGainNode();
+
+    a.flatGain = a.context.createGainNode();
+    a.convolverGain = a.context.createGainNode();
+
+    a.destination = a.mixer;
+    a.mixer.connect(a.flatGain);
+    a.mixer.connect(a.convolver);
+    a.convolver.connect(a.convolverGain);
+    a.flatGain.connect(a.volume);
+    a.convolverGain.connect(a.volume);
     a.volume.connect(a.context.destination);
-    a.destination = a.convolver;
+
+    a.environments = {};
+    this.loadEnvironment('cathedral');
+    this.loadEnvironment('filter-telephone');
+    this.loadEnvironment('echo-chamber');
+    this.loadEnvironment('bright-hall');
+  },
+
+  setEnvironment : function(name) {
+    if (this.audio.environments[name]) {
+      this.audio.convolverGain.gain.value = 1;
+      this.audio.flatGain.gain.value = 0;
+      this.audio.convolver.buffer = this.audio.environments[name];
+    } else {
+      this.audio.flatGain.gain.value = 1;
+      this.audio.convolverGain.gain.value = 0;
+    }
+  },
+
+  loadEnvironment : function(name) {
+    var self = this;
+    this.loadBuffer('impulse_responses/'+name+'.wav', function(buffer) {
+      self.audio.environments[name] = buffer;
+    });
+  },
+
+  loadBuffer : function(soundFileName, callback) {
+    var request = new XMLHttpRequest();
+    request.open("GET", soundFileName, true);
+    request.responseType = "arraybuffer";
+    var ctx = this.audio.context;
+    request.onload = function() {
+      var buffer = ctx.createBuffer(request.response, false);
+      callback(buffer);
+    };
+    request.send();
+    return request;
   },
 
   loadSound : function(soundFileName) {
@@ -94,15 +140,11 @@ Demo.prototype = {
     sound.volume.connect(sound.panner);
     sound.panner.connect(this.audio.destination);
 
-    var request = new XMLHttpRequest();
-    request.open("GET", soundFileName, true);
-    request.responseType = "arraybuffer";
-    request.onload = function() {
-      sound.buffer = ctx.createBuffer(request.response, true);
+    this.loadBuffer(soundFileName, function(buffer){
+      sound.buffer = buffer;
       sound.source.buffer = sound.buffer;
       sound.source.noteOn(ctx.currentTime + 0.020);
-    };
-    request.send();
+    });
 
     return sound;
   },
@@ -114,10 +156,62 @@ Demo.prototype = {
     this.camera.position.y = -0.50;
   },
 
+  createSoundCone : function(object, innerAngle, outerAngle, outerGain) {
+    var innerScale = 1, outerScale = 1;
+    var ia = innerAngle;
+    var oa = outerAngle;
+    if (outerAngle > Math.PI) {
+      oa = 2*Math.PI-outerAngle;
+      outerScale = -1;
+    }
+    if (innerAngle > Math.PI) {
+      ia = 2*Math.PI-innerAngle;
+      innerScale = -1;
+    }
+    var height = 5;
+    var innerRadius = Math.sin(ia/2) * height;
+    var innerHeight = Math.cos(ia/2) * height;
+    var outerRadius = Math.sin(oa/2) * height*0.9;
+    var outerHeight = Math.cos(oa/2) * height*0.9;
+    var innerConeGeo = new THREE.CylinderGeometry(0, innerRadius, innerHeight, 100, 1, true);
+    var outerConeGeo = new THREE.CylinderGeometry(0, outerRadius, outerHeight, 100, 1, true);
+
+    var innerCone = new THREE.Mesh(
+      innerConeGeo,
+      new THREE.MeshBasicMaterial({color: 0x00ff00, opacity: 0.5})
+    );
+    innerCone.doubleSided = true;
+    innerCone.material.transparent = true;
+    innerCone.material.blending = THREE.AdditiveBlending;
+    innerCone.material.depthWrite = false;
+    innerCone.scale.y = innerScale;
+    innerCone.position.y = -innerHeight/2 * innerScale;
+    var outerCone = new THREE.Mesh(
+      outerConeGeo,
+      new THREE.MeshBasicMaterial({color: 0xff0000, opacity: 0.5})
+    );
+    outerCone.doubleSided = true;
+    outerCone.material.transparent = true;
+    outerCone.material.blending = THREE.AdditiveBlending;
+    outerCone.material.depthWrite = false;
+    outerCone.scale.y = outerScale;
+    outerCone.position.y = -outerHeight/2 * outerScale;
+
+    var cones = new THREE.Object3D();
+    cones.add(innerCone);
+    cones.add(outerCone);
+    cones.rotation.x = -Math.PI/2;
+    object.add(cones);
+
+    object.sound.panner.coneInnerAngle = innerAngle*180/Math.PI;
+    object.sound.panner.coneOuterAngle = outerAngle*180/Math.PI;
+    object.sound.panner.coneOuterGain = outerGain;
+  },
+
   setupObjects : function() {
     this.setupAudio();
 
-    var cubeGeo = new THREE.CubeGeometry(2.00,1.00,2.00);
+    var cubeGeo = new THREE.CubeGeometry(1.20,1.20,2.00);
     var cubeMat = new THREE.MeshLambertMaterial({color: 0xFF0000});
     var cube = new THREE.Mesh(cubeGeo, cubeMat);
     this.cube = cube;
@@ -138,7 +232,8 @@ Demo.prototype = {
     plane.rotation.x = -Math.PI/2;
     this.scene.add(plane);
 
-    cube.sound = this.loadSound('breakbeat.wav');
+    cube.sound = this.loadSound('samples/breakbeat.wav');
+    this.createSoundCone(cube, 1.0, 3.8, 0.3);
 
     this.keyForward = this.keyBackward = this.keyLeft = this.keyRight = false;
     var self = this;
@@ -177,9 +272,7 @@ Demo.prototype = {
     var q = object.matrixWorld.getPosition();
     var dx = q.x-px, dy = q.y-py, dz = q.z-pz;
     audioNode.setPosition(q.x, q.y, q.z);
-    object.worldPosition = [q.x, q.y, q.z];
     if (this.velocityEnabled) {
-      object.velocity = [dx/dt, dy/dt, dz/dt];
       audioNode.setVelocity(dx/dt, dy/dt, dz/dt);
     }
   },
@@ -193,7 +286,6 @@ Demo.prototype = {
       m.n14 = m.n24 = m.n34 = 0;
       m.multiplyVector3(vec);
       vec.normalize();
-      object.orientation = [vec.x, vec.y, vec.z];
       object.sound.panner.setOrientation(vec.x, vec.y, vec.z);
       m.n14 = mx;
       m.n24 = my; 
@@ -212,12 +304,10 @@ Demo.prototype = {
       m.multiplyVector3(vec);
       vec.normalize();
 
-      var up = new THREE.Vector3(0,1,0);
+      var up = new THREE.Vector3(0,-1,0);
       m.multiplyVector3(up);
       up.normalize();
 
-      object.orientation = [vec.x, vec.y, vec.z];
-      object.up = [up.x, up.y, up.z];
       this.audio.context.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
 
       m.n14 = mx;
@@ -250,11 +340,6 @@ Demo.prototype = {
     var cy = Math.sin(t/600) * 1.50;
 
     this.setPosition(this.cube, cx, cy, cz, dt/1000);
-
-    var camera = this.camera;
-    var cube = this.cube;
-    console.log('camera: p(' + camera.worldPosition.join(',') + ') : v(' +camera.velocity.join(',')+ ') : o(' +camera.orientation.join(',')+ ') : u(' +camera.up.join(',')+ ')');
-    console.log('cube: p(' + cube.worldPosition.join(',') + ') : v(' +cube.velocity.join(',')+ ') : o(' +cube.orientation.join(',')+ ')');
 
   }
 
