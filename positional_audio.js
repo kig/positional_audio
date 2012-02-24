@@ -42,6 +42,19 @@ Demo.prototype = {
   maxTimeDelta : 60,
   playing : false,
 
+  objectCount : 1,
+  sounds : [
+    'samples/1.wav',
+    'samples/2.wav',
+    'samples/3.wav',
+    'samples/4.wav',
+    'samples/5.wav',
+    'samples/6.wav',
+    'samples/7.wav',
+    'samples/8.wav',
+    'samples/9.wav',
+    'samples/10.wav'
+  ],
   positionEnabled : true,
   velocityEnabled : true,
   orientationEnabled : true,
@@ -189,7 +202,7 @@ Demo.prototype = {
     this.loadBuffer(soundFileName, function(buffer){
       sound.buffer = buffer;
       sound.source.buffer = sound.buffer;
-      sound.source.noteOn(ctx.currentTime + 0.020);
+      sound.source.noteOn(ctx.currentTime);
     });
 
     return sound;
@@ -257,11 +270,24 @@ Demo.prototype = {
   setupObjects : function() {
     this.setupAudio();
 
-    var cubeGeo = new THREE.CubeGeometry(1.20,1.20,2.00);
-    var cubeMat = new THREE.MeshLambertMaterial({color: 0xFF0000});
-    var cube = new THREE.Mesh(cubeGeo, cubeMat);
-    this.cube = cube;
-    this.scene.add(cube);
+    this.cubes = [];
+
+    for (var i=0; i<this.objectCount; i++) {
+      var cubeGeo = new THREE.CubeGeometry(1.20,1.20,2.00);
+      var cubeMat = new THREE.MeshLambertMaterial({color: 0xFF0000});
+      var cube = new THREE.Mesh(cubeGeo, cubeMat);
+      cube.offsetX = (Math.random()-0.5)*5+(i-Math.floor(this.objectCount/2)) * 10;
+      cube.offsetZ = (Math.random()-0.5)*100;
+      cube.speedX = Math.random();
+      cube.speedY = Math.random();
+      cube.speedZ = Math.random();
+      cube.sound = this.loadSound(this.sounds[i % this.sounds.length]);
+      if (this.orientationEnabled) {
+        this.createSoundCone(cube, 1.0, 3.8, 0.1);
+      }
+      this.cubes.push(cube);
+      this.scene.add(cube);
+    }
 
     var light = new THREE.PointLight(0xFFFFFF);
     light.position.x = 4.00;
@@ -271,17 +297,12 @@ Demo.prototype = {
     this.scene.add(light);
 
     var plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(20, 200, 20, 200),
+      new THREE.PlaneGeometry(200, 200, 200, 200),
       new THREE.MeshLambertMaterial({color: 0xffffff})
     );
     plane.position.y = -5.0;
     plane.rotation.x = -Math.PI/2;
     this.scene.add(plane);
-
-    cube.sound = this.loadSound('samples/breakbeat.wav');
-    if (this.orientationEnabled) {
-      this.createSoundCone(cube, 1.0, 3.8, 0.1);
-    }
 
     this.keyForward = this.keyBackward = this.keyLeft = this.keyRight = false;
     var self = this;
@@ -327,7 +348,6 @@ Demo.prototype = {
       }
     }, false);
     window.addEventListener('keyup', function(ev) {
-      console.log(ev.which, ev.keyCode);
       switch (ev.keyCode) {
         case 'W'.charCodeAt(0):
         case 38:
@@ -436,19 +456,22 @@ Demo.prototype = {
     this.camera.lookAt(this.camera.target.position);
     this.setListenerPosition(this.camera, camX, camY, camZ, dt/1000);
 
-    if (this.velocityEnabled && this.orientationEnabled) {
-      this.cube.rotation.x += dt/1000;
+    for (var i=0; i<this.cubes.length; i++) {
+      var cube = this.cubes[i];
+      if (this.velocityEnabled && this.orientationEnabled) {
+        cube.rotation.x += (0.5+cube.speedX)*dt/1000;
+      }
+      cube.rotation.y += (0.5+cube.speedY)*dt/800;
+      var cx = (0.5-cube.speedZ)*Math.cos(t/3000*cube.speedX) * 25.00 + cube.offsetX;
+      var cz = (0.5-cube.speedZ)*Math.sin(t/3000*cube.speedX) * 25.00 + cube.offsetZ; 
+      if (this.velocityEnabled && !this.orientationEnabled) {
+        cx = Math.cos(t/1500) * 5.00;
+        cz = Math.sin(t/1500) * 50.00+-10;
+      }
+      var cy = Math.sin(t/600*cube.speedY) * 1.50;
+      
+      this.setPosition(cube, cx, cy, cz, dt/1000);
     }
-    this.cube.rotation.y += dt/800;
-    var cx = Math.cos(t/3000) * 5.00;
-    var cz = Math.sin(t/3000) * 5.00;
-    if (this.velocityEnabled && !this.orientationEnabled) {
-      cx = Math.cos(t/1500) * 5.00;
-      cz = Math.sin(t/1500) * 50.00+-10;
-    }
-    var cy = Math.sin(t/600) * 1.50;
-
-    this.setPosition(this.cube, cx, cy, cz, dt/1000);
 
   }
 
