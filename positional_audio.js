@@ -433,29 +433,39 @@ Demo.prototype = {
     }
   },
 
+  accel : 0,
   update : function(t, dt) {
     this.updateCameraTarget();
     var cp = this.camera.position;
     var camZ = cp.z, camX = cp.x, camY = cp.y;
     var vz = Math.cos(this.xangle);
     var vx = Math.sin(this.xangle);
-    var speed = 1/10;
+    var speed = 1/60 + Math.min(1/10, 1/2000 * this.accel);
+    var ac = -1;
     if (this.keyForward) {
       camX += vx*dt*speed;
       camZ += vz*dt*speed;
+      ac = 1;
     }
     if (this.keyBackward) {
       camX -= vx*dt*speed;
       camZ -= vz*dt*speed;
+      ac = 1;
     }
     if (this.keyLeft) {
       camZ -= vx*dt*speed;
       camX -= -vz*dt*speed;
+      ac = 1;
     }
     if (this.keyRight) {
       camZ += vx*dt*speed;
       camX += -vz*dt*speed;
+      ac = 1;
     }
+    this.accel += ac;
+    if (ac < 0)
+      this.accel = 0;
+
     this.camera.lookAt(this.camera.target.position);
     this.setListenerPosition(this.camera, camX, camY, camZ, dt/1000);
 
