@@ -128,6 +128,7 @@ Demo.prototype = {
     a.context = new webkitAudioContext();
     a.convolver = a.context.createConvolver();
     a.volume = a.context.createGainNode();
+    a.volume.gain.value = 2;
 
     a.mixer = a.context.createGainNode();
 
@@ -283,7 +284,9 @@ Demo.prototype = {
       cube.speedZ = Math.random();
       cube.sound = this.loadSound(this.sounds[i % this.sounds.length]);
       if (this.orientationEnabled) {
-        this.createSoundCone(cube, 1.0, 3.8, 0.1);
+        var outer = Math.random()*3.14 + 1.5;
+        var inner = Math.min(outer-0.2, Math.random() + 0.5);
+        this.createSoundCone(cube, inner, outer, 0.2);
       }
       this.cubes.push(cube);
       this.scene.add(cube);
@@ -436,7 +439,7 @@ Demo.prototype = {
     var camZ = cp.z, camX = cp.x, camY = cp.y;
     var vz = Math.cos(this.xangle);
     var vx = Math.sin(this.xangle);
-    var speed = 1/60;
+    var speed = 1/10;
     if (this.keyForward) {
       camX += vx*dt*speed;
       camZ += vz*dt*speed;
